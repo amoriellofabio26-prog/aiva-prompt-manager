@@ -141,8 +141,10 @@
   <script>
     let currentData = null;
 
-    function loadData() {
-      google.script.run.withSuccessHandler(data => {
+    async function loadData() {
+      try {
+        const response = await fetch('/api/prompt');
+        const data = await response.json();
         currentData = data;
         document.getElementById('current-prompt').innerText = data.promptAtualizado;
         document.getElementById('version-badge').innerText = 'v' + data.versao.toFixed(1);
@@ -150,20 +152,26 @@
           document.getElementById('new-prompt').value = data.promptAtualizado;
         }
         updateUI();
-      }).getPromptAtual();
+      } catch (error) {
+        console.error('Erro ao carregar prompt:', error);
+      }
 
-      google.script.run.withSuccessHandler(backups => {
+      try {
+        const response = await fetch('/api/backups');
+        const backups = await response.json();
         const list = document.getElementById('history-list');
         list.innerHTML = backups.map(b => `
           <div class="bg-card border border-line rounded-xl p-4 space-y-2">
             <div class="flex justify-between items-start">
               <p class="text-xs font-bold text-white line-clamp-1">${b.backup}</p>
-              <button onclick="restorePrompt('${b.prompt.replace(/'/g, "\\'")}')" class="text-blue-500 hover:text-blue-400">↩</button>
+              <button onclick="restorePrompt('${b.prompt.replace(/'/g, "\\'").replace(/\n/g, "\\n")}')" class="text-blue-500 hover:text-blue-400">↩</button>
             </div>
             <p class="text-[10px] text-gray-500 italic line-clamp-2">"${b.prompt}"</p>
           </div>
         `).join('');
-      }).getBackups();
+      } catch (error) {
+        console.error('Erro ao carregar backups:', error);
+      }
     }
 
     function updateUI() {
@@ -195,7 +203,7 @@
       document.getElementById('modal').classList.add('hidden');
     }
 
-    function executeSave() {
+    async function executeSave() {
       closeModal();
       const btn = document.getElementById('save-btn');
       const newPrompt = document.getElementById('new-prompt').value;
@@ -204,7 +212,18 @@
       btn.disabled = true;
       btn.innerText = '⏳ PROCESSANDO...';
 
-      google.script.run.withSuccessHandler(res => {
+      try {
+        const response = await fetch('/api/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            novoPrompt: newPrompt, 
+            logDeAlteracoes: log,
+            category: '#INFORMAÇÕES ADICIONAIS'
+          })
+        });
+        const res = await response.json();
+        
         if (res.success) {
           btn.innerText = '✅ SALVO!';
           btn.classList.replace('btn-gradient', 'bg-green-600');
@@ -218,7 +237,11 @@
           btn.disabled = false;
           btn.innerText = '⚡ SALVAR E ATUALIZAR VERSÃO';
         }
-      }).atualizarPrompt(newPrompt, log);
+      } catch (error) {
+        alert('Erro de conexão: ' + error.message);
+        btn.disabled = false;
+        btn.innerText = '⚡ SALVAR E ATUALIZAR VERSÃO';
+      }
     }
 
     function restorePrompt(text) {
