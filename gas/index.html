@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AIVA Prompt Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #0a0a0a; color: #e2e8f0; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #252525; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3b82f6; }
+    .bg-card { background-color: #141414; }
+    .border-line { border-color: #252525; }
+    .btn-gradient { background: linear-gradient(to right, #2563eb, #4f46e5); }
+    .loading-skeleton { background: linear-gradient(90deg, #141414 25%, #1a1a1a 50%, #141414 75%); background-size: 200% 100%; animation: skeleton-loading 1.5s infinite; }
+    @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  </style>
+</head>
+<body class="antialiased selection:bg-blue-500/30">
+
+  <div id="app" class="min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="sticky top-0 z-40 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-line px-6 py-4">
+      <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold text-white tracking-tight">Prompt Manager</h1>
+            <p class="text-[10px] text-gray-500 font-mono uppercase tracking-widest">Workspace Edition</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 bg-card border border-line px-3 py-1.5 rounded-full">
+            <span class="text-[10px] uppercase font-bold text-gray-500">Versão Atual</span>
+            <span id="version-badge" class="text-sm font-mono text-blue-400 font-bold">v0.0</span>
+          </div>
+          <div class="flex items-center gap-2 bg-card border border-line px-3 py-1.5 rounded-full">
+            <span class="text-[10px] uppercase font-bold text-gray-500">Status</span>
+            <div class="flex items-center gap-1.5">
+              <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              <span class="text-xs font-medium text-green-400">Ativo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
+      <!-- Editor -->
+      <div class="lg:col-span-8 space-y-8">
+        <!-- Block 1 -->
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold uppercase tracking-wider text-gray-500">📌 Prompt Atual (Salvo no Sheets)</label>
+            <button onclick="copyText('current-prompt')" class="text-xs text-gray-400 hover:text-white transition-colors">Copiar</button>
+          </div>
+          <div id="current-prompt" class="bg-[#1a1a1a] border border-line rounded-xl p-4 font-mono text-sm text-gray-400 h-32 overflow-y-auto whitespace-pre-wrap leading-relaxed">Carregando...</div>
+        </section>
+
+        <!-- Block 2 -->
+        <section class="space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold uppercase tracking-wider text-gray-500">Novo Prompt</label>
+            <div class="flex items-center gap-4">
+              <span id="unsaved-indicator" class="hidden text-[10px] font-bold text-orange-500 animate-pulse">✏️ Alterações não salvas</span>
+              <span id="char-count" class="text-[10px] font-mono text-gray-500">0 caracteres</span>
+            </div>
+          </div>
+          <textarea id="new-prompt" oninput="updateUI()" placeholder="Cole ou escreva o novo prompt aqui..." class="w-full min-h-[400px] bg-card border border-line focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 rounded-xl p-6 font-mono text-sm text-white placeholder:text-gray-700 transition-all resize-none leading-relaxed"></textarea>
+        </section>
+
+        <!-- Block 3 -->
+        <section class="space-y-3">
+          <label class="text-xs font-bold uppercase tracking-wider text-gray-500">Log de Alterações</label>
+          <textarea id="log-input" oninput="updateUI()" placeholder="Descreva o que mudou nesta versão..." class="w-full min-h-[100px] bg-card border border-line focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 rounded-xl p-4 text-sm text-white placeholder:text-gray-700 transition-all resize-none"></textarea>
+        </section>
+
+        <!-- Info Panel -->
+        <div class="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-6 space-y-4">
+          <h3 class="text-sm font-bold text-blue-400 uppercase tracking-widest">⚡ Resumo da Atualização</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-2">
+              <p class="text-[10px] uppercase font-bold text-gray-500">Backup (Aba Backups)</p>
+              <ul class="text-xs space-y-1 text-gray-400">
+                <li>• Prompt da Versão: Cópia do atual</li>
+                <li>• Log: <span id="summary-log">...</span></li>
+                <li>• Versão: <span id="summary-v-old">...</span></li>
+              </ul>
+            </div>
+            <div class="space-y-2">
+              <p class="text-[10px] uppercase font-bold text-gray-500">Base Principal (Aba Prompts)</p>
+              <ul class="text-xs space-y-1 text-gray-400">
+                <li>• Prompt Atualizado: Seu novo texto</li>
+                <li>• Versão: <span id="summary-v-new">...</span></li>
+                <li>• Log de Alterações: Limpo</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Save Button -->
+        <div class="flex justify-center pt-4">
+          <button id="save-btn" onclick="confirmSave()" class="btn-gradient px-12 py-5 rounded-2xl font-bold text-lg text-white shadow-xl shadow-blue-900/40 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+            ⚡ SALVAR E ATUALIZAR VERSÃO
+          </button>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="lg:col-span-4 space-y-6">
+        <h2 class="text-sm font-bold uppercase tracking-widest text-white">Histórico de Backups</h2>
+        <div id="history-list" class="space-y-4 max-h-[1000px] overflow-y-auto pr-2 custom-scrollbar">
+          <!-- Backups will be injected here -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-6">
+    <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div class="relative w-full max-w-md bg-card border border-line rounded-3xl p-8 space-y-6">
+      <div class="text-center space-y-2">
+        <h3 class="text-xl font-bold text-white">Confirmar Atualização?</h3>
+        <p class="text-sm text-gray-400">Uma nova versão será criada e o backup da versão atual será salvo.</p>
+      </div>
+      <div class="flex gap-3">
+        <button onclick="closeModal()" class="flex-1 py-4 rounded-xl font-bold text-sm bg-[#1a1a1a] text-gray-400">Cancelar</button>
+        <button onclick="executeSave()" class="flex-1 py-4 rounded-xl font-bold text-sm bg-blue-600 text-white">✅ Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentData = null;
+
+    function loadData() {
+      google.script.run.withSuccessHandler(data => {
+        currentData = data;
+        document.getElementById('current-prompt').innerText = data.promptAtualizado;
+        document.getElementById('version-badge').innerText = 'v' + data.versao.toFixed(1);
+        if (!document.getElementById('new-prompt').value) {
+          document.getElementById('new-prompt').value = data.promptAtualizado;
+        }
+        updateUI();
+      }).getPromptAtual();
+
+      google.script.run.withSuccessHandler(backups => {
+        const list = document.getElementById('history-list');
+        list.innerHTML = backups.map(b => `
+          <div class="bg-card border border-line rounded-xl p-4 space-y-2">
+            <div class="flex justify-between items-start">
+              <p class="text-xs font-bold text-white line-clamp-1">${b.backup}</p>
+              <button onclick="restorePrompt('${b.prompt.replace(/'/g, "\\'")}')" class="text-blue-500 hover:text-blue-400">↩</button>
+            </div>
+            <p class="text-[10px] text-gray-500 italic line-clamp-2">"${b.prompt}"</p>
+          </div>
+        `).join('');
+      }).getBackups();
+    }
+
+    function updateUI() {
+      const newPrompt = document.getElementById('new-prompt').value;
+      const log = document.getElementById('log-input').value;
+      
+      document.getElementById('char-count').innerText = newPrompt.length + ' caracteres';
+      document.getElementById('unsaved-indicator').classList.toggle('hidden', !currentData || newPrompt === currentData.promptAtualizado);
+      document.getElementById('save-btn').disabled = !newPrompt;
+
+      if (currentData) {
+        document.getElementById('summary-log').innerText = log || '(Vazio)';
+        document.getElementById('summary-v-old').innerText = 'v' + currentData.versao.toFixed(1);
+        document.getElementById('summary-v-new').innerText = 'v' + (currentData.versao + 0.1).toFixed(1);
+      }
+    }
+
+    function copyText(id) {
+      const text = document.getElementById(id).value || document.getElementById(id).innerText;
+      navigator.clipboard.writeText(text);
+      alert('Copiado!');
+    }
+
+    function confirmSave() {
+      document.getElementById('modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+    }
+
+    function executeSave() {
+      closeModal();
+      const btn = document.getElementById('save-btn');
+      const newPrompt = document.getElementById('new-prompt').value;
+      const log = document.getElementById('log-input').value;
+
+      btn.disabled = true;
+      btn.innerText = '⏳ PROCESSANDO...';
+
+      google.script.run.withSuccessHandler(res => {
+        if (res.success) {
+          btn.innerText = '✅ SALVO!';
+          btn.classList.replace('btn-gradient', 'bg-green-600');
+          setTimeout(() => {
+            btn.classList.replace('bg-green-600', 'btn-gradient');
+            btn.innerText = '⚡ SALVAR E ATUALIZAR VERSÃO';
+            loadData();
+          }, 3000);
+        } else {
+          alert('Erro: ' + res.error);
+          btn.disabled = false;
+          btn.innerText = '⚡ SALVAR E ATUALIZAR VERSÃO';
+        }
+      }).atualizarPrompt(newPrompt, log);
+    }
+
+    function restorePrompt(text) {
+      if (confirm('Restaurar este prompt para o editor?')) {
+        document.getElementById('new-prompt').value = text;
+        updateUI();
+      }
+    }
+
+    window.onload = loadData;
+  </script>
+</body>
+</html>
