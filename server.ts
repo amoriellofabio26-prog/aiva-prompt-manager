@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Initialize Notion Client
 const getNotionClient = () => {
@@ -330,6 +330,11 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
+    const gasPath = path.join(process.cwd(), "gas");
+    
+    // Serve the old GAS UI for compatibility
+    app.use("/promptmanager/gas", express.static(gasPath));
+    
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
